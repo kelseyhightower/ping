@@ -14,6 +14,8 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"log"
 
 	"github.com/kelseyhightower/ping"
@@ -26,17 +28,26 @@ const (
 	version = "v1.0.0"
 )
 
+var (
+	serverAddr string
+)
+
 func main() {
-	conn, err := grpc.Dial("127.0.0.1:50051", grpc.WithInsecure())
+	flag.StringVar(&serverAddr, "server", "127.0.0.1:50051", "The ping server address")
+	flag.Parse()
+
+	conn, err := grpc.Dial(serverAddr, grpc.WithInsecure())
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer conn.Close()
+
 	c := ping.NewPingClient(conn)
+
 	response, err := c.Ping(context.Background(), &ping.Request{})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Printf(response.Message)
+	fmt.Println(response.Message)
 }
