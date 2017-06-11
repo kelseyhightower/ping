@@ -27,9 +27,7 @@ import (
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -43,11 +41,6 @@ var (
 	serviceBAddr string
 	serviceCAddr string
 )
-
-type server struct {
-	bc ping.PingClient
-	cc ping.PingClient
-}
 
 func main() {
 	flag.StringVar(&grpcAddr, "grpc", "127.0.0.1:50051", "The gRPC listen address")
@@ -107,54 +100,4 @@ func main() {
 	log.Printf("Shutdown signal received shutting down gracefully...")
 
 	s.GracefulStop()
-}
-
-func (s *server) Ping(ctx context.Context, in *ping.Request) (*ping.Response, error) {
-	p, ok := peer.FromContext(ctx)
-	if ok {
-		log.Printf("Ping request from %s", p.Addr)
-	}
-
-	rb, err := s.bc.Ping(context.Background(), &ping.Request{})
-	if err != nil {
-		log.Printf("Error calling service B: %v", err)
-		return nil, err
-	}
-
-	rc, err := s.cc.Ping(context.Background(), &ping.Request{})
-	if err != nil {
-		log.Printf("Error calling service C: %v", err)
-		return nil, err
-	}
-
-	log.Printf("Service B version: %s", rb.Version)
-	log.Printf("Service C version: %s", rc.Version)
-
-	return &ping.Response{Message: "Pong", Version: version}, nil
-}
-
-func httpHealthServer(server *health.Server) http.Handler {
-	return &healthHandler{server}
-}
-
-type healthHandler struct {
-	healthServer *health.Server
-}
-
-func (h *healthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	hcr, err := h.healthServer.Check(context.Background(), &healthpb.HealthCheckRequest{""})
-	if err != nil {
-		log.Println("Error checking gRPC server health", err)
-		w.WriteHeader(http.StatusServiceUnavailable)
-		return
-	}
-
-	switch hcr.Status.String() {
-	case "UNKNOWN":
-		w.WriteHeader(http.StatusServiceUnavailable)
-	case "SERVING":
-		w.WriteHeader(http.StatusOK)
-	case "NOT_SERVING":
-		w.WriteHeader(http.StatusServiceUnavailable)
-	}
 }
