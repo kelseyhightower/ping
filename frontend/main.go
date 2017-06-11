@@ -17,11 +17,15 @@ import (
 	"flag"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/kelseyhightower/ping"
+
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -34,7 +38,8 @@ const (
 )
 
 var (
-	listenAddr   string
+	grpcAddr     string
+	httpAddr     string
 	serviceBAddr string
 	serviceCAddr string
 )
@@ -45,13 +50,15 @@ type server struct {
 }
 
 func main() {
-	flag.StringVar(&listenAddr, "listen-addr", "127.0.0.1:50051", "The gRPC listen address")
+	flag.StringVar(&grpcAddr, "grpc", "127.0.0.1:50051", "The gRPC listen address")
+	flag.StringVar(&httpAddr, "http", "127.0.0.1:80", "The HTTP listen address")
 	flag.StringVar(&serviceBAddr, "service-b-addr", "127.0.0.1:50052", "The address for service B")
 	flag.StringVar(&serviceCAddr, "service-c-addr", "127.0.0.1:50053", "The address for service C")
 	flag.Parse()
 
 	log.Println("Starting frontend service ...")
-	log.Println("Listening on", listenAddr)
+	log.Printf("gRPC server listening on: %s", grpcAddr)
+	log.Printf("HTTP server listening on: %s", httpAddr)
 
 	// Create a gRPC client for service B.
 	bconn, err := grpc.Dial(serviceBAddr, grpc.WithInsecure())
@@ -73,13 +80,24 @@ func main() {
 	ping.RegisterPingServer(s, &server{bc, cc})
 	reflection.Register(s)
 
-	ln, err := net.Listen("tcp", listenAddr)
+	healthServer := health.NewServer()
+	healthServer.SetServingStatus("grpc.health.v1.helloservice", 0)
+	healthpb.RegisterHealthServer(s, healthServer)
+
+	ln, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	go func() {
 		log.Fatal(s.Serve(ln))
+	}()
+
+	healthServer.SetServingStatus("grpc.health.v1.helloservice", 1)
+
+	http.Handle("/healthz", httpHealthServer(healthServer))
+	go func() {
+		log.Fatal(http.ListenAndServe(httpAddr, nil))
 	}()
 
 	signalChan := make(chan os.Signal, 1)
@@ -113,4 +131,30 @@ func (s *server) Ping(ctx context.Context, in *ping.Request) (*ping.Response, er
 	log.Printf("Service C version: %s", rc.Version)
 
 	return &ping.Response{Message: "Pong", Version: version}, nil
+}
+
+func httpHealthServer(server *health.Server) http.Handler {
+	return &healthHandler{server}
+}
+
+type healthHandler struct {
+	healthServer *health.Server
+}
+
+func (h *healthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	hcr, err := h.healthServer.Check(context.Background(), &healthpb.HealthCheckRequest{""})
+	if err != nil {
+		log.Println("Error checking gRPC server health", err)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
+	switch hcr.Status.String() {
+	case "UNKNOWN":
+		w.WriteHeader(http.StatusServiceUnavailable)
+	case "SERVING":
+		w.WriteHeader(http.StatusOK)
+	case "NOT_SERVING":
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
 }
