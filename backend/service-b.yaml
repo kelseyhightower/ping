@@ -26,6 +26,7 @@ spec:
       containers:
         - name: backend
           image: gcr.io/hightowerlabs/backend:0.0.1
+          imagePullPolicy: Always
           args:
             - "-grpc=0.0.0.0:50050"
             - "-http=0.0.0.0:80"
