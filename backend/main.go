@@ -17,15 +17,16 @@ import (
 	"flag"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/kelseyhightower/ping"
 
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -34,19 +35,20 @@ const (
 )
 
 var (
-	listenAddr string
+	grpcAddr string
+	httpAddr string
 )
 
-type server struct{}
-
 func main() {
-	flag.StringVar(&listenAddr, "listen-addr", "127.0.0.1:50052", "GRPC listen address")
+	flag.StringVar(&grpcAddr, "grpc", "127.0.0.1:50051", "The gRPC listen address")
+	flag.StringVar(&httpAddr, "http", "127.0.0.1:80", "The HTTP listen address")
 	flag.Parse()
 
 	log.Println("Starting backend service ...")
-	log.Println("Listening on", listenAddr)
+	log.Printf("gRPC server listening on: %s", grpcAddr)
+	log.Printf("HTTP server listening on: %s", httpAddr)
 
-	ln, err := net.Listen("tcp", listenAddr)
+	ln, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -55,8 +57,19 @@ func main() {
 	ping.RegisterPingServer(s, &server{})
 	reflection.Register(s)
 
+	healthServer := health.NewServer()
+	healthServer.SetServingStatus("grpc.health.v1.helloservice", 0)
+	healthpb.RegisterHealthServer(s, healthServer)
+
 	go func() {
 		log.Fatal(s.Serve(ln))
+	}()
+
+	healthServer.SetServingStatus("grpc.health.v1.helloservice", 1)
+
+	http.Handle("/healthz", httpHealthServer(healthServer))
+	go func() {
+		log.Fatal(http.ListenAndServe(httpAddr, nil))
 	}()
 
 	signalChan := make(chan os.Signal, 1)
@@ -66,12 +79,4 @@ func main() {
 	log.Printf("Shutdown signal received shutting down gracefully...")
 
 	s.GracefulStop()
-}
-
-func (s *server) Ping(ctx context.Context, in *ping.Request) (*ping.Response, error) {
-	p, ok := peer.FromContext(ctx)
-	if ok {
-		log.Printf("Ping request from %s", p.Addr)
-	}
-	return &ping.Response{Message: "Pong", Version: version}, nil
 }
