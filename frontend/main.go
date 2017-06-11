@@ -17,6 +17,9 @@ import (
 	"flag"
 	"log"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/kelseyhightower/ping"
 
@@ -31,6 +34,7 @@ const (
 )
 
 var (
+	listenAddr   string
 	serviceBAddr string
 	serviceCAddr string
 )
@@ -41,11 +45,15 @@ type server struct {
 }
 
 func main() {
-	flag.StringVar(&serviceBAddr, "service-b-addr", "127.0.0.1:50052", "The address for service b.")
-	flag.StringVar(&serviceCAddr, "service-c-addr", "127.0.0.1:50053", "The address for service c.")
+	flag.StringVar(&listenAddr, "listen-addr", "127.0.0.1:50051", "The gRPC listen address")
+	flag.StringVar(&serviceBAddr, "service-b-addr", "127.0.0.1:50052", "The address for service B")
+	flag.StringVar(&serviceCAddr, "service-c-addr", "127.0.0.1:50053", "The address for service C")
 	flag.Parse()
 
-	// Create service b client.
+	log.Println("Starting frontend service ...")
+	log.Println("Listening on", listenAddr)
+
+	// Create a gRPC client for service B.
 	bconn, err := grpc.Dial(serviceBAddr, grpc.WithInsecure())
 	if err != nil {
 		log.Fatal(err)
@@ -53,7 +61,7 @@ func main() {
 	defer bconn.Close()
 	bc := ping.NewPingClient(bconn)
 
-	// Create service c client.
+	// Create a gRPC client for service C.
 	cconn, err := grpc.Dial(serviceCAddr, grpc.WithInsecure())
 	if err != nil {
 		log.Fatal(err)
@@ -65,12 +73,22 @@ func main() {
 	ping.RegisterPingServer(s, &server{bc, cc})
 	reflection.Register(s)
 
-	ln, err := net.Listen("tcp", ":50051")
+	ln, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Fatal(s.Serve(ln))
+	go func() {
+		log.Fatal(s.Serve(ln))
+	}()
+
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+	<-signalChan
+
+	log.Printf("Shutdown signal received shutting down gracefully...")
+
+	s.GracefulStop()
 }
 
 func (s *server) Ping(ctx context.Context, in *ping.Request) (*ping.Response, error) {
@@ -81,13 +99,13 @@ func (s *server) Ping(ctx context.Context, in *ping.Request) (*ping.Response, er
 
 	rb, err := s.bc.Ping(context.Background(), &ping.Request{})
 	if err != nil {
-		log.Printf("Error: call to service-b failed: %v", err)
+		log.Printf("Error calling service B: %v", err)
 		return nil, err
 	}
 
 	rc, err := s.cc.Ping(context.Background(), &ping.Request{})
 	if err != nil {
-		log.Printf("Error: call to service-c failed: %v", err)
+		log.Printf("Error calling service C: %v", err)
 		return nil, err
 	}
 

@@ -17,6 +17,9 @@ import (
 	"flag"
 	"log"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/kelseyhightower/ping"
 
@@ -37,8 +40,11 @@ var (
 type server struct{}
 
 func main() {
-	flag.StringVar(&listenAddr, "listen-addr", ":50052", "GRPC listen address")
+	flag.StringVar(&listenAddr, "listen-addr", "127.0.0.1:50052", "GRPC listen address")
 	flag.Parse()
+
+	log.Println("Starting backend service ...")
+	log.Println("Listening on", listenAddr)
 
 	ln, err := net.Listen("tcp", listenAddr)
 	if err != nil {
@@ -49,7 +55,17 @@ func main() {
 	ping.RegisterPingServer(s, &server{})
 	reflection.Register(s)
 
-	log.Fatal(s.Serve(ln))
+	go func() {
+		log.Fatal(s.Serve(ln))
+	}()
+
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+	<-signalChan
+
+	log.Printf("Shutdown signal received shutting down gracefully...")
+
+	s.GracefulStop()
 }
 
 func (s *server) Ping(ctx context.Context, in *ping.Request) (*ping.Response, error) {
