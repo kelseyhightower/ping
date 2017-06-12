@@ -33,7 +33,7 @@ var (
 )
 
 func main() {
-	flag.StringVar(&serverAddr, "server", "127.0.0.1:50051", "The ping server address")
+	flag.StringVar(&serverAddr, "server", "127.0.0.1:8080", "The ping server address")
 	flag.Parse()
 
 	conn, err := grpc.Dial(serverAddr, grpc.WithInsecure())

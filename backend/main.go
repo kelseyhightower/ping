@@ -40,7 +40,7 @@ var (
 )
 
 func main() {
-	flag.StringVar(&grpcAddr, "grpc", "127.0.0.1:50051", "The gRPC listen address")
+	flag.StringVar(&grpcAddr, "grpc", "127.0.0.1:8080", "The gRPC listen address")
 	flag.StringVar(&httpAddr, "http", "127.0.0.1:80", "The HTTP listen address")
 	flag.Parse()
 
