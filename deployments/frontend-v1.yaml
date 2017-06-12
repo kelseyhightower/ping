@@ -13,13 +13,13 @@ spec:
         - name: frontend
           image: gcr.io/hightowerlabs/frontend:v1
           args:
-            - "-grpc=0.0.0.0:50050"
+            - "-bar=bar:8080"
+            - "-foo=foo:8080"
+            - "-grpc=0.0.0.0:8080"
             - "-http=0.0.0.0:80"
-            - "-service-b=service-b:50050"
-            - "-service-c=service-c:50050"
           ports:
             - name: grpc
-              containerPort: 50050
+              containerPort: 8080
             - name: http
               containerPort: 80
           livenessProbe:

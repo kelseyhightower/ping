@@ -1,12 +1,12 @@
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: service-two-v2
+  name: bar-v2
 spec:
   template:
     metadata:
       labels:
-        app: service-two
+        app: bar
         version: v2
     spec:
       containers:
@@ -14,11 +14,11 @@ spec:
           image: gcr.io/hightowerlabs/backend:v2
           imagePullPolicy: Always
           args:
-            - "-grpc=0.0.0.0:50050"
+            - "-grpc=0.0.0.0:8080"
             - "-http=0.0.0.0:80"
           ports:
             - name: grpc
-              containerPort: 50050
+              containerPort: 8080
             - name: http
               containerPort: 80
           livenessProbe:

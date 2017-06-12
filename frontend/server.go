@@ -22,8 +22,8 @@ import (
 )
 
 type server struct {
-	bc ping.PingClient
-	cc ping.PingClient
+	bar ping.PingClient
+	foo ping.PingClient
 }
 
 func (s *server) Ping(ctx context.Context, in *ping.Request) (*ping.Response, error) {
@@ -32,20 +32,20 @@ func (s *server) Ping(ctx context.Context, in *ping.Request) (*ping.Response, er
 		log.Printf("Ping request from %s", p.Addr)
 	}
 
-	rb, err := s.bc.Ping(context.Background(), &ping.Request{})
+	barResponse, err := s.bar.Ping(context.Background(), &ping.Request{})
 	if err != nil {
-		log.Printf("Error calling service B: %v", err)
+		log.Printf("Error calling service bar: %v", err)
 		return nil, err
 	}
 
-	rc, err := s.cc.Ping(context.Background(), &ping.Request{})
+	fooResponse, err := s.foo.Ping(context.Background(), &ping.Request{})
 	if err != nil {
-		log.Printf("Error calling service C: %v", err)
+		log.Printf("Error calling service foo: %v", err)
 		return nil, err
 	}
 
-	log.Printf("Service B version: %s", rb.Version)
-	log.Printf("Service C version: %s", rc.Version)
+	log.Printf("bar version: %s", barResponse.Version)
+	log.Printf("foo version: %s", fooResponse.Version)
 
 	return &ping.Response{Message: "Pong", Version: version}, nil
 }

@@ -36,41 +36,41 @@ const (
 )
 
 var (
-	grpcAddr     string
-	httpAddr     string
-	serviceBAddr string
-	serviceCAddr string
+	barAddr  string
+	fooAddr  string
+	grpcAddr string
+	httpAddr string
 )
 
 func main() {
-	flag.StringVar(&grpcAddr, "grpc", "127.0.0.1:50051", "The gRPC listen address")
+	flag.StringVar(&barAddr, "bar", "", "The bar service address")
+	flag.StringVar(&fooAddr, "foo", "", "The foo service address")
+	flag.StringVar(&grpcAddr, "grpc", "127.0.0.1:8080", "The gRPC listen address")
 	flag.StringVar(&httpAddr, "http", "127.0.0.1:80", "The HTTP listen address")
-	flag.StringVar(&serviceBAddr, "service-b", "127.0.0.1:50052", "The address for service B")
-	flag.StringVar(&serviceCAddr, "service-c", "127.0.0.1:50053", "The address for service C")
 	flag.Parse()
 
 	log.Println("Starting frontend service ...")
 	log.Printf("gRPC server listening on: %s", grpcAddr)
 	log.Printf("HTTP server listening on: %s", httpAddr)
 
-	// Create a gRPC client for service B.
-	bconn, err := grpc.Dial(serviceBAddr, grpc.WithInsecure())
+	// Create a gRPC client for service bar.
+	barConn, err := grpc.Dial(barAddr, grpc.WithInsecure())
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer bconn.Close()
-	bc := ping.NewPingClient(bconn)
+	defer barConn.Close()
+	barClient := ping.NewPingClient(barConn)
 
-	// Create a gRPC client for service C.
-	cconn, err := grpc.Dial(serviceCAddr, grpc.WithInsecure())
+	// Create a gRPC client for service foo.
+	fooConn, err := grpc.Dial(fooAddr, grpc.WithInsecure())
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer cconn.Close()
-	cc := ping.NewPingClient(cconn)
+	defer fooConn.Close()
+	fooClient := ping.NewPingClient(fooConn)
 
 	s := grpc.NewServer()
-	ping.RegisterPingServer(s, &server{bc, cc})
+	ping.RegisterPingServer(s, &server{barClient, fooClient})
 	reflection.Register(s)
 
 	healthServer := health.NewServer()
