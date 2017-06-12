@@ -1,0 +1,44 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: backend-v1
+spec:
+  template:
+    metadata:
+      labels:
+        app: backend
+        version: v1
+    spec:
+      containers:
+        - name: backend
+          image: gcr.io/hightowerlabs/backend:v1
+          args:
+            - "-grpc=0.0.0.0:50050"
+            - "-http=0.0.0.0:80"
+          ports:
+            - name: grpc
+              containerPort: 50050
+            - name: http
+              containerPort: 80
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 1
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+              scheme: HTTP
+            initialDelaySeconds: 5
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: 500m
+              memory: 20M
+            requests:
+              cpu: 100m
+              memory: 10M

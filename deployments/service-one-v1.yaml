@@ -1,31 +1,17 @@
-apiVersion: v1
-kind: Service
-metadata:
-  name: service-c
-  labels:
-    app: service-c
-spec:
-  ports:
-    - name: grpc
-      port: 50050
-    - name: http
-      port: 80
-  selector:
-    app: service-c
----
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: service-c
+  name: service-one-v1
 spec:
   template:
     metadata:
       labels:
-        app: service-c
+        app: service-one
+        version: v1
     spec:
       containers:
         - name: backend
-          image: gcr.io/hightowerlabs/backend:0.0.1
+          image: gcr.io/hightowerlabs/backend:v1
           imagePullPolicy: Always
           args:
             - "-grpc=0.0.0.0:50050"

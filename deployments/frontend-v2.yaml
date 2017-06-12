@@ -1,34 +1,22 @@
-apiVersion: v1
-kind: Service
-metadata:
-  name: backend
-  labels:
-    app: backend
-spec:
-  ports:
-    - name: grpc
-      port: 50050
-    - name: http
-      port: 80
-  selector:
-    app: backend
----
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: backend
+  name: frontend-v2
 spec:
   template:
     metadata:
       labels:
-        app: backend
+        app: frontend
+        version: v2
     spec:
       containers:
-        - name: backend
-          image: gcr.io/hightowerlabs/backend:0.0.1
+        - name: frontend
+          image: gcr.io/hightowerlabs/frontend:v2
           args:
             - "-grpc=0.0.0.0:50050"
             - "-http=0.0.0.0:80"
+            - "-service-b=service-b:50050"
+            - "-service-c=service-c:50050"
           ports:
             - name: grpc
               containerPort: 50050
