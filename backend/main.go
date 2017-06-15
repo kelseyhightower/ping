@@ -31,18 +31,25 @@ import (
 )
 
 const (
-	version = "v2.0.0"
+	version = "v2"
 )
 
 var (
 	grpcAddr string
 	httpAddr string
+	region   string
 )
 
 func main() {
 	flag.StringVar(&grpcAddr, "grpc", "127.0.0.1:8080", "The gRPC listen address")
 	flag.StringVar(&httpAddr, "http", "127.0.0.1:80", "The HTTP listen address")
+	flag.StringVar(&region, "region", "", "The compute region")
 	flag.Parse()
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Fatal("Error getting hostname:", err)
+	}
 
 	log.Println("Starting backend service ...")
 	log.Printf("gRPC server listening on: %s", grpcAddr)
@@ -53,21 +60,21 @@ func main() {
 		log.Fatal(err)
 	}
 
-	s := grpc.NewServer()
-	ping.RegisterPingServer(s, &server{})
-	reflection.Register(s)
+	grpcServer := grpc.NewServer()
+	ping.RegisterPingServer(grpcServer, &server{hostname, region, version})
+	reflection.Register(grpcServer)
 
 	healthServer := health.NewServer()
 	healthServer.SetServingStatus("grpc.health.v1.helloservice", 0)
-	healthpb.RegisterHealthServer(s, healthServer)
+	healthpb.RegisterHealthServer(grpcServer, healthServer)
 
 	go func() {
-		log.Fatal(s.Serve(ln))
+		log.Fatal(grpcServer.Serve(ln))
 	}()
 
 	healthServer.SetServingStatus("grpc.health.v1.helloservice", 1)
 
-	http.Handle("/healthz", httpHealthServer(healthServer))
+	http.Handle("/health", httpHealthServer(healthServer))
 	go func() {
 		log.Fatal(http.ListenAndServe(httpAddr, nil))
 	}()
@@ -78,5 +85,5 @@ func main() {
 
 	log.Printf("Shutdown signal received shutting down gracefully...")
 
-	s.GracefulStop()
+	grpcServer.GracefulStop()
 }

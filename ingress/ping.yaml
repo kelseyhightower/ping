@@ -1,0 +1,14 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ping
+  annotations:
+    kubernetes.io/ingress.class: istio
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /ping
+        backend:
+          serviceName: frontend
+          servicePort: 80

@@ -18,34 +18,53 @@ import (
 
 	"github.com/kelseyhightower/ping"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 type server struct {
-	bar ping.PingClient
-	foo ping.PingClient
+	bar      ping.PingClient
+	foo      ping.PingClient
+	hostname string
+	region   string
+	version  string
 }
 
 func (s *server) Ping(ctx context.Context, in *ping.Request) (*ping.Response, error) {
-	p, ok := peer.FromContext(ctx)
-	if ok {
-		log.Printf("Ping request from %s", p.Addr)
-	}
-
-	barResponse, err := s.bar.Ping(context.Background(), &ping.Request{})
+	// Call the bar service and extract the version from the response metadata.
+	barMetadata := metadata.New(map[string]string{})
+	barCtx := context.Background()
+	_, err := s.bar.Ping(barCtx, &ping.Request{}, grpc.Trailer(&barMetadata))
 	if err != nil {
-		log.Printf("Error calling service bar: %v", err)
+		log.Printf("Error calling bar service: %v", err)
 		return nil, err
 	}
 
-	fooResponse, err := s.foo.Ping(context.Background(), &ping.Request{})
+	barVersion := barMetadata["version"][0]
+
+	// Call the foo service and extract the version from the response metadata.
+	fooMetadata := metadata.New(map[string]string{})
+	fooCtx := context.Background()
+	_, err = s.foo.Ping(fooCtx, &ping.Request{}, grpc.Trailer(&fooMetadata))
 	if err != nil {
-		log.Printf("Error calling service foo: %v", err)
+		log.Printf("Error calling foo service: %v", err)
 		return nil, err
 	}
 
-	log.Printf("bar version: %s", barResponse.Version)
-	log.Printf("foo version: %s", fooResponse.Version)
+	fooVersion := fooMetadata["version"][0]
 
-	return &ping.Response{Message: "Pong", Version: version}, nil
+	// Set the reponse metadata that will be send back to the client.
+	md := metadata.New(map[string]string{
+		"barVersion": barVersion,
+		"fooVersion": fooVersion,
+		"hostname":   s.hostname,
+		"region":     s.region,
+		"version":    s.version,
+	})
+
+	if err := grpc.SetTrailer(ctx, md); err != nil {
+		log.Printf("Error setting the response metadata: %v", err)
+	}
+
+	return &ping.Response{Message: "pong"}, nil
 }

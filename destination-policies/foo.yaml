@@ -1,0 +1,17 @@
+type: destination-policy
+name: foo-default
+spec:
+  destination: foo.default.svc.cluster.local
+  policy:
+    - loadBalancing:
+        name: RANDOM
+      circuitBreaker:
+        simpleCb:
+          maxConnections: 100
+          httpMaxPendingRequests: 1024
+          httpMaxRequests: 1024
+          sleepWindow: 10s
+          httpConsecutiveErrors: 3
+          httpDetectionInterval: 10s
+          httpMaxRequestsPerConnection: 1024
+          httpMaxEjectionPercent: 10

@@ -12,31 +12,24 @@ spec:
       containers:
         - name: frontend
           image: gcr.io/hightowerlabs/frontend:v1
+          imagePullPolicy: Always
+          env:
+            - name: REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: cluster
+                  key: region
           args:
-            - "-bar=bar:8080"
-            - "-foo=foo:8080"
-            - "-grpc=0.0.0.0:8080"
+            - "-bar=bar:8000"
+            - "-foo=foo:8000"
+            - "-grpc=0.0.0.0:8000"
             - "-http=0.0.0.0:80"
+            - "-region=$(REGION)"
           ports:
             - name: grpc
-              containerPort: 8080
+              containerPort: 8000
             - name: http
               containerPort: 80
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 80
-              scheme: HTTP
-            initialDelaySeconds: 5
-            periodSeconds: 5
-            timeoutSeconds: 1
-          readinessProbe:
-            httpGet:
-              path: /healthz
-              port: 80
-              scheme: HTTP
-            initialDelaySeconds: 5
-            timeoutSeconds: 1
           resources:
             limits:
               cpu: 500m

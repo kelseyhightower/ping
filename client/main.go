@@ -22,6 +22,7 @@ import (
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 const (
@@ -44,10 +45,12 @@ func main() {
 
 	c := ping.NewPingClient(conn)
 
-	response, err := c.Ping(context.Background(), &ping.Request{})
+	md := metadata.New(map[string]string{})
+	response, err := c.Ping(context.Background(), &ping.Request{}, grpc.Trailer(&md))
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	fmt.Printf("%v\n", md)
 	fmt.Println(response.Message)
 }

@@ -1,0 +1,19 @@
+type: route-rule
+name: foo-default
+spec:
+  destination: foo.default.svc.cluster.local
+  precedence: 1
+  route:
+    - tags:
+        version: v1
+      weight: 50
+    - tags:
+        version: v2
+      weight: 50
+  httpReqRetries:
+    simpleRetry:
+      attempts: 3
+      perTryTimeout: 5s
+  httpReqTimeout:
+    simpleTimeout:
+      timeout: 10s

@@ -1,0 +1,5 @@
+#!/bin/bash
+./build
+docker build -t gcr.io/hightowerlabs/backend:v2 .
+gcloud docker -- push gcr.io/hightowerlabs/backend:v2
+rm backend
