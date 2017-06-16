@@ -31,27 +31,46 @@ type server struct {
 }
 
 func (s *server) Ping(ctx context.Context, in *ping.Request) (*ping.Response, error) {
-	// Call the bar service and extract the version from the response metadata.
-	barMetadata := metadata.New(map[string]string{})
+	// Propagate the appropriate HTTP headers so that when the proxies send
+	// span information to Zipkin, the spans can be correlated correctly into
+	// a single trace.
+	h := map[string]string{}
+	imd, ok := metadata.FromIncomingContext(ctx)
+	if ok {
+		h["x-request-id"] = imd["x-request-id"][0]
+		h["x-b3-traceid"] = imd["x-b3-traceid"][0]
+		h["x-b3-spanid"] = imd["x-b3-spanid"][0]
+		h["x-b3-parentspanid"] = imd["x-b3-parentspanid"][0]
+		h["x-b3-sampled"] = imd["x-b3-sampled"][0]
+		h["x-b3-flags"] = imd["x-b3-flags"][0]
+		h["x-ot-span-context"] = imd["x-ot-span-context"][0]
+	}
+
+	hmd := metadata.New(h)
+
+	// Call the bar service with the trace headers and extract the version
+	// from the response metadata.
+	bmd := metadata.New(map[string]string{})
 	barCtx := context.Background()
-	_, err := s.bar.Ping(barCtx, &ping.Request{}, grpc.Trailer(&barMetadata))
+	_, err := s.bar.Ping(barCtx, &ping.Request{}, grpc.Header(&hmd), grpc.Trailer(&bmd))
 	if err != nil {
 		log.Printf("Error calling bar service: %v", err)
 		return nil, err
 	}
 
-	barVersion := barMetadata["version"][0]
+	barVersion := bmd["version"][0]
 
-	// Call the foo service and extract the version from the response metadata.
-	fooMetadata := metadata.New(map[string]string{})
+	// Call the foo service with the trace headers and extract the version
+	// from the response metadata.
+	fmd := metadata.New(map[string]string{})
 	fooCtx := context.Background()
-	_, err = s.foo.Ping(fooCtx, &ping.Request{}, grpc.Trailer(&fooMetadata))
+	_, err = s.foo.Ping(fooCtx, &ping.Request{}, grpc.Header(&hmd), grpc.Trailer(&fmd))
 	if err != nil {
 		log.Printf("Error calling foo service: %v", err)
 		return nil, err
 	}
 
-	fooVersion := fooMetadata["version"][0]
+	fooVersion := fmd["version"][0]
 
 	// Set the reponse metadata that will be send back to the client.
 	md := metadata.New(map[string]string{
