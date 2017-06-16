@@ -8,6 +8,9 @@ spec:
   rules:
   - http:
       paths:
+      - backend:
+          serviceName: frontend
+          servicePort: 8000
       - path: /ping
         backend:
           serviceName: frontend
