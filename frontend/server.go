@@ -52,8 +52,8 @@ func (s *server) Ping(ctx context.Context, in *ping.Request) (*ping.Response, er
 	// Call the bar service with the trace headers and extract the version
 	// from the response metadata.
 	bmd := metadata.New(map[string]string{})
-	barCtx := context.Background()
-	_, err := s.bar.Ping(barCtx, &ping.Request{}, grpc.Header(&hmd), grpc.Trailer(&bmd))
+	barCtx := metadata.NewOutgoingContext(context.Background(), hmd)
+	_, err := s.bar.Ping(barCtx, &ping.Request{}, grpc.Trailer(&bmd))
 	if err != nil {
 		log.Printf("Error calling bar service: %v", err)
 		return nil, err
@@ -64,8 +64,8 @@ func (s *server) Ping(ctx context.Context, in *ping.Request) (*ping.Response, er
 	// Call the foo service with the trace headers and extract the version
 	// from the response metadata.
 	fmd := metadata.New(map[string]string{})
-	fooCtx := context.Background()
-	_, err = s.foo.Ping(fooCtx, &ping.Request{}, grpc.Header(&hmd), grpc.Trailer(&fmd))
+	fooCtx := metadata.NewOutgoingContext(context.Background(), hmd)
+	_, err = s.foo.Ping(fooCtx, &ping.Request{}, grpc.Trailer(&fmd))
 	if err != nil {
 		log.Printf("Error calling foo service: %v", err)
 		return nil, err
