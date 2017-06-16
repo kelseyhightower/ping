@@ -1,0 +1,4 @@
+rules:
+  - aspects:
+      - kind: denials
+    selector: source.labels["app"]=="frontend"
