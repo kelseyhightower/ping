@@ -14,6 +14,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"net"
@@ -35,14 +36,14 @@ const (
 )
 
 var (
-	grpcAddr string
-	httpAddr string
-	region   string
+	grpcAddr   string
+	healthAddr string
+	region     string
 )
 
 func main() {
 	flag.StringVar(&grpcAddr, "grpc", "127.0.0.1:8080", "The gRPC listen address")
-	flag.StringVar(&httpAddr, "http", "127.0.0.1:80", "The HTTP listen address")
+	flag.StringVar(&healthAddr, "health", "127.0.0.1:8008", "The health listen address")
 	flag.StringVar(&region, "region", "", "The compute region")
 	flag.Parse()
 
@@ -53,7 +54,7 @@ func main() {
 
 	log.Println("Starting backend service ...")
 	log.Printf("gRPC server listening on: %s", grpcAddr)
-	log.Printf("HTTP server listening on: %s", httpAddr)
+	log.Printf("Health server listening on: %s", healthAddr)
 
 	ln, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
@@ -64,20 +65,24 @@ func main() {
 	ping.RegisterPingServer(grpcServer, &server{hostname, region, version})
 	reflection.Register(grpcServer)
 
-	healthServer := health.NewServer()
-	healthServer.SetServingStatus("grpc.health.v1.helloservice", 0)
-	healthpb.RegisterHealthServer(grpcServer, healthServer)
+	grpcHealthServer := health.NewServer()
+	grpcHealthServer.SetServingStatus("ping.Ping", 0)
+	healthpb.RegisterHealthServer(grpcServer, grpcHealthServer)
 
 	go func() {
 		log.Fatal(grpcServer.Serve(ln))
 	}()
 
-	healthServer.SetServingStatus("grpc.health.v1.helloservice", 1)
+	// Setup a HTTP server for health checks.
+	healthMux := http.NewServeMux()
+	healthMux.Handle("/health", httpHealthServer(grpcHealthServer))
+	healthServer := http.Server{Addr: healthAddr, Handler: healthMux}
 
-	http.Handle("/health", httpHealthServer(healthServer))
 	go func() {
-		log.Fatal(http.ListenAndServe(httpAddr, nil))
+		log.Fatal(healthServer.ListenAndServe())
 	}()
+
+	grpcHealthServer.SetServingStatus("ping.Ping", 1)
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
@@ -86,4 +91,5 @@ func main() {
 	log.Printf("Shutdown signal received shutting down gracefully...")
 
 	grpcServer.GracefulStop()
+	healthServer.Shutdown(context.Background())
 }

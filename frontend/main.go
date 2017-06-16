@@ -14,6 +14,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"net"
@@ -36,23 +37,26 @@ const (
 )
 
 var (
-	barAddr  string
-	fooAddr  string
-	grpcAddr string
-	httpAddr string
-	region   string
+	barAddr    string
+	fooAddr    string
+	grpcAddr   string
+	healthAddr string
+	httpAddr   string
+	region     string
 )
 
 func main() {
 	flag.StringVar(&barAddr, "bar", "", "The bar service address")
 	flag.StringVar(&fooAddr, "foo", "", "The foo service address")
 	flag.StringVar(&grpcAddr, "grpc", "127.0.0.1:8080", "The gRPC listen address")
+	flag.StringVar(&healthAddr, "health", "127.0.0.1:8008", "The health listen address")
 	flag.StringVar(&httpAddr, "http", "127.0.0.1:80", "The HTTP listen address")
 	flag.StringVar(&region, "region", "", "The compute region")
 	flag.Parse()
 
 	log.Println("Starting frontend service ...")
 	log.Printf("gRPC server listening on: %s", grpcAddr)
+	log.Printf("Health server listening on: %s", healthAddr)
 	log.Printf("HTTP server listening on: %s", httpAddr)
 
 	hostname, err := os.Hostname()
@@ -76,14 +80,15 @@ func main() {
 	defer fooConn.Close()
 	fooClient := ping.NewPingClient(fooConn)
 
+	// Setup the gRPC server.
 	grpcServer := grpc.NewServer()
 	s := &server{barClient, fooClient, hostname, region, version}
 	ping.RegisterPingServer(grpcServer, s)
 	reflection.Register(grpcServer)
 
-	healthServer := health.NewServer()
-	healthServer.SetServingStatus("grpc.health.v1.helloservice", 0)
-	healthpb.RegisterHealthServer(grpcServer, healthServer)
+	grpcHealthServer := health.NewServer()
+	grpcHealthServer.SetServingStatus("ping.Ping", 0)
+	healthpb.RegisterHealthServer(grpcServer, grpcHealthServer)
 
 	ln, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
@@ -94,13 +99,25 @@ func main() {
 		log.Fatal(grpcServer.Serve(ln))
 	}()
 
-	healthServer.SetServingStatus("grpc.health.v1.helloservice", 1)
+	// Setup a HTTP server for health checks.
+	healthMux := http.NewServeMux()
+	healthMux.Handle("/health", httpHealthServer(grpcHealthServer))
+	healthServer := http.Server{Addr: healthAddr, Handler: healthMux}
 
-	http.Handle("/health", httpHealthServer(healthServer))
-	http.Handle("/ping", httpPingServer(grpcAddr))
 	go func() {
-		log.Fatal(http.ListenAndServe(httpAddr, nil))
+		log.Fatal(healthServer.ListenAndServe())
 	}()
+
+	// Setup a HTTP server to proxy the gRPC server.
+	mux := http.NewServeMux()
+	mux.Handle("/ping", httpPingServer(grpcAddr))
+	httpServer := http.Server{Addr: httpAddr, Handler: mux}
+
+	go func() {
+		log.Fatal(httpServer.ListenAndServe())
+	}()
+
+	grpcHealthServer.SetServingStatus("ping.Ping", 1)
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
@@ -109,4 +126,6 @@ func main() {
 	log.Printf("Shutdown signal received shutting down gracefully...")
 
 	grpcServer.GracefulStop()
+	healthServer.Shutdown(context.Background())
+	httpServer.Shutdown(context.Background())
 }

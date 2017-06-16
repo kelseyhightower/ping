@@ -20,16 +20,35 @@ spec:
                   name: cluster
                   key: region
           args:
-            - "-bar=bar:8000"
-            - "-foo=foo:8000"
-            - "-grpc=0.0.0.0:8000"
+            - "-bar=bar:8080"
+            - "-foo=foo:8080"
+            - "-grpc=0.0.0.0:8080"
+            - "-health=0.0.0.0:8008"
             - "-http=0.0.0.0:80"
             - "-region=$(REGION)"
           ports:
             - name: grpc
-              containerPort: 8000
+              containerPort: 8080
             - name: http
               containerPort: 80
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8008
+            failureThreshold: 3
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8008
+            failureThreshold: 3
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
           resources:
             limits:
               cpu: 500m

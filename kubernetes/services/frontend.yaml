@@ -7,9 +7,9 @@ metadata:
 spec:
   ports:
     - name: grpc
-      port: 8000
+      port: 8080
       protocol: TCP
-      targetPort: 8000
+      targetPort: 8080
     - name: http
       port: 80
       protocol: TCP

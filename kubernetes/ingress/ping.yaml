@@ -10,7 +10,7 @@ spec:
       paths:
       - backend:
           serviceName: frontend
-          servicePort: 8000
+          servicePort: 8080
       - path: /ping
         backend:
           serviceName: frontend

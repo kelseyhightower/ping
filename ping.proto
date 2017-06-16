@@ -10,5 +10,4 @@ message Request {}
 
 message Response {
   string message = 1;
-  string version = 2;
 }
