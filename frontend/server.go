@@ -37,13 +37,14 @@ func (s *server) Ping(ctx context.Context, in *ping.Request) (*ping.Response, er
 	h := map[string]string{}
 	imd, ok := metadata.FromIncomingContext(ctx)
 	if ok {
-		h["x-request-id"] = imd["x-request-id"][0]
-		h["x-b3-traceid"] = imd["x-b3-traceid"][0]
-		h["x-b3-spanid"] = imd["x-b3-spanid"][0]
-		h["x-b3-parentspanid"] = imd["x-b3-parentspanid"][0]
-		h["x-b3-sampled"] = imd["x-b3-sampled"][0]
-		h["x-b3-flags"] = imd["x-b3-flags"][0]
-		h["x-ot-span-context"] = imd["x-ot-span-context"][0]
+		for k, v := range imd {
+			switch k {
+			case "x-request-id", "x-b3-traceid", "x-b3-spanid", "x-b3-sampled":
+				h[k] = v[0]
+			case "x-b3-flags", "x-ot-span-context", "x-b3-parentspanid":
+				h[k] = v[0]
+			}
+		}
 	}
 
 	hmd := metadata.New(h)
