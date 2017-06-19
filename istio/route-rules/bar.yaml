@@ -1,7 +1,7 @@
 type: route-rule
-name: foo-default
+name: bar-default
 spec:
-  destination: foo.default.svc.cluster.local
+  destination: bar.default.svc.cluster.local
   precedence: 1
   route:
     - tags:
