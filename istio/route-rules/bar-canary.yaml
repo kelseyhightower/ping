@@ -1,0 +1,12 @@
+type: route-rule
+name: bar-canary
+spec:
+  destination: bar.default.svc.cluster.local
+  match:
+    httpHeaders:
+      x-forwarded-user-agent:
+        exact: mobile
+  precedence: 2
+  route:
+    - tags:
+        version: v2

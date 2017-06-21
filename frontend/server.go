@@ -43,6 +43,8 @@ func (s *server) Ping(ctx context.Context, in *ping.Request) (*ping.Response, er
 				h[k] = v[0]
 			case "x-b3-flags", "x-ot-span-context", "x-b3-parentspanid":
 				h[k] = v[0]
+			case "x-forwarded-user-agent":
+				h[k] = v[0]
 			}
 		}
 	}

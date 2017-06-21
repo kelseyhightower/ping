@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/kelseyhightower/ping"
 
@@ -43,6 +44,25 @@ type httpResponse struct {
 }
 
 func (p *pingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Propagate the appropriate HTTP headers so that when the proxies send
+	// span information to Zipkin, the spans can be correlated correctly into
+	// a single trace.
+	h := map[string]string{}
+
+	for k, v := range r.Header {
+		k = strings.ToLower(k)
+		switch k {
+		case "x-request-id", "x-b3-traceid", "x-b3-spanid", "x-b3-sampled":
+			h[k] = v[0]
+		case "x-b3-flags", "x-ot-span-context", "x-b3-parentspanid":
+			h[k] = v[0]
+		case "user-agent":
+			h["x-forwarded-user-agent"] = v[0]
+		}
+	}
+
+	hmd := metadata.New(h)
+
 	conn, err := grpc.Dial(p.localAddr, grpc.WithInsecure())
 	if err != nil {
 		log.Println("Error calling the local ping server", err)
@@ -54,7 +74,7 @@ func (p *pingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	client := ping.NewPingClient(conn)
 
 	md := metadata.New(map[string]string{})
-	ctx := context.Background()
+	ctx := metadata.NewOutgoingContext(context.Background(), hmd)
 	grpcResponse, err := client.Ping(ctx, &ping.Request{}, grpc.Trailer(&md))
 	if err != nil {
 		log.Println("Error calling the local ping server", err)
